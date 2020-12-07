@@ -1,0 +1,209 @@
+---
+title: "Repro_Research_CP2"
+author: "Brian Liswell"
+date: "12/3/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Repro Course Project 2: Title that Briefly summarizes data analysis
+
+Storms are bad.  If you can't stop them, try to live better with them.
+
+## Synopsis
+
+!!!!!!!!!!!!
+Describes and summarizes the data analysis in less than 10 sentences
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database.
+
+Questions
+Your data analysis must address the following questions:
+
+**1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?**
+
+The Dataset has columns for "FATALITIES" and "INJURIES".  Those will be the categories for population health.
+
+**2. Across the United States, which types of events have the greatest economic consequences?**
+
+The Dataset has columns for "FATALITIES" and "INJURIES".  Those will be the categories for population health.
+
+
+
+### 1. Has either a (1) valid RPubs URL pointing to a data analysis document for this assignment been submitted; or (2) a complete PDF file presenting the data analysis been uploaded?
+
+If you are reading this, the answer is yes.
+
+### 2. Is the document written in English?
+
+I don't want to brag, but I speak English like it's the first language I learned.
+
+### 3. Does the analysis include description and justification for any data transformations?
+
+This question should be at the end.
+!!!!!!!!!!!!!!!!!!!!
+
+### 4. Does the document have a title that briefly summarizes the data analysis?
+What's the question the analysis/synthesis is trying to answer?
+!!!!!!!!!!!!!!!!!!!!
+
+### 5. Does the document have a synopsis that describes and summarizes the data analysis in less than 10 sentences?
+
+See Synopsis at the top.
+
+### 6. Is there a section titled "Data Processing" that describes how the data were loaded into R and processed for analysis?
+
+See below, until question 7.
+
+## Data Processing
+
+### Get the data
+
+
+```{r echo=TRUE}
+
+file_loc <- 'https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2'
+filename <-'Storm_data.csv.bz2'
+download.file(file_loc,filename)
+data <- read.csv(filename)
+
+ev_names <- data$EVTYPE
+dim(data)
+dim(ev_names)
+```
+
+Most of the columns is needless for this activity. Pair down to just the possibly needed variables.
+
+
+```{r echo=TRUE}
+var_names <- names(data)
+names_to_pair <- var_names[c(7,8,22,23,24,25,27)]
+# [1] "STATE"      "EVTYPE"     "MAG"        "FATALITIES"
+# [5] "INJURIES"   "PROPDMG"    "CROPDMG" 
+data <- data[names_to_pair]
+```
+
+902297 seperate events recorded, asssigned an Event Type.
+985 different "Event" Type names.
+Broadly speaking the Events can be categorized into 7 categories.
+
+
+```{r echo=TRUE}
+var_names <- names(data)
+names_to_pair <- var_names[c(7,8,22,23,24,25,27)]
+
+
+storm_names <-c("wind", "tstm", "tornado", "tropical", "storm", "torrent", "thunder", "hurric", "blizzard")
+big_wind_names <-c("tornado", "hurric", "gustnado", "funnel")
+precip_names <-c("hail", "rain", "snow", "shower", "precip", "sleet")
+mud_names <- c("mud")
+flood_names <-c("flood","surf","surge","current")
+temper_names <- c("cold","heat","hot","blizzard","freez","frost")
+
+```
+
+Add a new Category to data data.frame, based on 7 category names, and "Other" if it doesn't fit.  Use a function, get_tf, to compare different possible names in category.
+
+```{r echo=TRUE}
+get_tf <-function(sub_names,ev_names){
+        tf <- logical(length(ev_names))
+        for(n in sub_names){
+                #print(n)
+                temp <- grepl(n,tolower(ev_names))
+                tf <-tf + temp
+        }
+        tf <- tf >0  
+}
+storm_tf <- get_tf(storm_names,ev_names)
+big_wind_tf <- get_tf(big_wind_names,ev_names)
+precip_tf <- get_tf(precip_names,ev_names)
+mud_tf <- get_tf(mud_names,ev_names)
+flood_tf <- get_tf(flood_names,ev_names)
+temper_tf <- get_tf(temper_names,ev_names)
+
+categ <- character(length(ev_names))
+categ[storm_tf] <-"storm"
+categ[big_wind_tf] <- "big_wind"
+categ[precip_tf] <- "precip"
+categ[mud_tf] <- "mud"
+categ[flood_tf] <- "flood"
+categ[temper_tf] <- "temper"
+categ[!nzchar(categ)] <- "other"
+
+data$Broad_categ <- categ
+```
+
+Split up the data based on the broad categories.
+A "pairs" plot on the original "data" takes forever, and might be useless.
+"pairs" plots on the seperate broad categories also take a long time.  Save them to file if you wish.  Entire for loop took more than 45 minutes to make files.
+
+```{r echo=TRUE}
+data_sub_categ_split <- split(data,data$Broad_categ)
+categ_names <- names(data_sub_categ_split)
+# 
+# for(n in categ_names){
+#         com <-paste0("pairs(data_sub_categ_split$",n,")")
+#         plot_name <- paste0("plot_",n,".png")
+#         png(file=plot_name)
+#         eval(parse(text = com))
+#         dev.off()
+# }
+
+# pairs(data_sub_categ_split$other)
+
+```
+
+Now sum INJURIES, FATALITIES, PROPDMG and CROPDMG for the 7 subcategories
+
+```{r echo=TRUE}
+FATALITIES <- data.frame(Category = categ_names)
+FATALITIES$Total <-0
+row.names(FATALITIES) <- categ_names
+INJURIES <- FATALITIES
+PROPDMG <- FATALITIES
+CROPDMG <- FATALITIES
+
+for(n in categ_names){
+        FATALITIES[n,"Total"] <- sum(data_sub_categ_split[[n]]$FATALITIES)
+        INJURIES[n,"Total"] <- sum(data_sub_categ_split[[n]]$INJURIES)
+        PROPDMG[n,"Total"] <- sum(data_sub_categ_split[[n]]$PROPDMG)
+        CROPDMG[n,"Total"] <- sum(data_sub_categ_split[[n]]$CROPDMG)
+}
+
+```
+
+
+### 7. Is there a section titled "Results" where the main results are presented?
+
+## Results
+
+Create Bar charts for the 4 variables of interest.  Point out interesting things.
+
+```{r echo=TRUE}
+library(ggplot2)
+p<-ggplot(data=FATALITIES, aes(x=Category, y=Total)) +
+  geom_bar(stat="identity")+ggtitle("Fatalities")
+print(p)
+
+p<-ggplot(data=INJURIES, aes(x=Category, y=Total)) +
+  geom_bar(stat="identity")+ggtitle("INJURIES")
+print(p)
+p<-ggplot(data=PROPDMG, aes(x=Category, y=Total)) +
+  geom_bar(stat="identity")+ggtitle("PROPDMG")
+print(p)
+p<-ggplot(data=CROPDMG, aes(x=Category, y=Total)) +
+  geom_bar(stat="identity")+ggtitle("CROPDMG")
+print(p)
+
+
+```
+
+
+
+
+
